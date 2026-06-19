@@ -2,6 +2,7 @@
   "name": "@interview-assistant/desktop",
   "version": "0.1.0",
   "description": "Electron desktop client for the Interview Assistant SaaS.",
+  "author": "Interview Assistant",
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {

@@ -1,5 +1,10 @@
 appId: ai.interviewassistant.desktop
 productName: Interview Assistant
+# Pin the Electron version explicitly. In this npm-workspaces monorepo `electron`
+# is hoisted to the ROOT node_modules (not packages/desktop/node_modules) and the
+# package.json range ("^31.1.0") is not a fixed version, so electron-builder
+# cannot auto-compute it. Pinning the installed version fixes the build.
+electronVersion: 31.7.7
 directories:
   output: dist
   buildResources: build
