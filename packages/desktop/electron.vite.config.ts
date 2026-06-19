@@ -2,11 +2,22 @@ import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
-// Externalize real npm dependencies (ws, @supabase/supabase-js, ...) so they are
-// loaded from node_modules at runtime instead of bundled — this avoids bundling
-// ws's optional native add-ons (bufferutil/utf-8-validate). The shared workspace
-// package is TypeScript source, so it must be BUNDLED, not externalized.
+// IMPORTANT (monorepo packaging): the MAIN process deps (ws, @supabase/supabase-js,
+// pdf-parse, mammoth) are BUNDLED into out/main rather than externalized. In this
+// npm-workspaces repo those deps are hoisted to the ROOT node_modules, so
+// electron-builder (which collects production deps from packages/desktop/node_modules)
+// would ship an app with NO node_modules and the main process would crash at runtime
+// with MODULE_NOT_FOUND. Bundling makes the build self-contained and independent of
+// node_modules layout. electron-vite still keeps `electron` and Node built-ins
+// external automatically; we additionally externalize ws's OPTIONAL native add-ons
+// (bufferutil/utf-8-validate) — ws falls back to pure JS when they are absent.
+//
+// The preload still externalizes deps (it only uses electron + bundled shared types).
 const externalize = externalizeDepsPlugin({ exclude: ['@interview-assistant/shared'] })
+
+// Optional native add-ons that `ws` tries to require but does not need; keep them
+// out of the bundle so Rollup doesn't fail resolving them.
+const WS_OPTIONAL_NATIVE = ['bufferutil', 'utf-8-validate']
 
 // ---------------------------------------------------------------------------
 // Build-time config injection (dev-release, design §C / Data Models).
@@ -33,10 +44,10 @@ const externalize = externalizeDepsPlugin({ exclude: ['@interview-assistant/shar
 
 export default defineConfig({
   main: {
-    plugins: [externalize],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'main/index.ts') }
+        input: { index: resolve(__dirname, 'main/index.ts') },
+        external: WS_OPTIONAL_NATIVE
       }
     }
   },
