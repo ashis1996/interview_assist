@@ -22,20 +22,23 @@ export interface EnvEntry {
 export type EnvConfig = Record<Environment, EnvEntry>
 
 /**
- * Build-time inlined env values (electron-vite / Vite `define`). In a packaged
- * `dev` installer these carry the baked `dev` endpoints + Supabase publishable
- * key as `import.meta.env.MAIN_VITE_DEV_*` (design §C, Req 2.5, 4.1–4.5).
+ * Read a build-time baked value via DIRECT static `import.meta.env.MAIN_VITE_*`
+ * access. That direct form is the ONLY one Vite/electron-vite replaces with the
+ * literal value at build time (design §C, Req 2.5, 4.1–4.5) — capturing
+ * `import.meta.env` into a variable or using a dynamic key defeats the
+ * replacement and nothing gets baked in.
  *
- * Access is guarded so this is safe everywhere it runs:
- * - Packaged build: `import.meta.env.MAIN_VITE_*` are inlined literals.
- * - Local `tsx`/Node run: `import.meta` exists but has no `env` → `{}`.
- * - Vitest: `import.meta.env` exists but the `MAIN_VITE_*` keys are undefined.
- * In every non-packaged case the `process.env` path below takes precedence, so
- * unit tests can drive the resolver purely through the injected `env` argument.
+ * Wrapped so non-built runtimes never throw: a bare `tsx`/Node run has no
+ * `import.meta.env` (caught → undefined); under vitest `import.meta.env` exists
+ * but the MAIN_VITE keys are undefined, so unit tests drive resolution purely
+ * through the injected `env` argument.
  */
-function bakedEnv(): Record<string, string | undefined> {
-  const meta = import.meta as unknown as { env?: Record<string, string | undefined> }
-  return meta.env ?? {}
+function baked(read: () => string | undefined): string | undefined {
+  try {
+    return read()
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -48,7 +51,6 @@ function bakedEnv(): Record<string, string | undefined> {
  * `import.meta.env.MAIN_VITE_DEV_*` values, then empty.
  */
 export function defaultEnvConfig(env: NodeJS.ProcessEnv = process.env): EnvConfig {
-  const baked = bakedEnv()
   const entry = (prefix: string, fallback: Partial<EnvEntry> = {}): EnvEntry => ({
     backendBaseUrl: env[`${prefix}_BACKEND_URL`] ?? fallback.backendBaseUrl ?? '',
     sessionGatewayUrl: env[`${prefix}_GATEWAY_URL`] ?? fallback.sessionGatewayUrl ?? '',
@@ -62,10 +64,10 @@ export function defaultEnvConfig(env: NodeJS.ProcessEnv = process.env): EnvConfi
       sessionGatewayUrl: 'ws://127.0.0.1:8787',
     }),
     dev: entry('DEV', {
-      backendBaseUrl: baked['MAIN_VITE_DEV_BACKEND_URL'],
-      sessionGatewayUrl: baked['MAIN_VITE_DEV_GATEWAY_URL'],
-      supabaseUrl: baked['MAIN_VITE_DEV_SUPABASE_URL'],
-      supabasePublishableKey: baked['MAIN_VITE_DEV_SUPABASE_ANON_KEY'],
+      backendBaseUrl: baked(() => import.meta.env.MAIN_VITE_DEV_BACKEND_URL),
+      sessionGatewayUrl: baked(() => import.meta.env.MAIN_VITE_DEV_GATEWAY_URL),
+      supabaseUrl: baked(() => import.meta.env.MAIN_VITE_DEV_SUPABASE_URL),
+      supabasePublishableKey: baked(() => import.meta.env.MAIN_VITE_DEV_SUPABASE_ANON_KEY),
     }),
     'pre-prod': entry('PREPROD'),
     prod: entry('PROD'),

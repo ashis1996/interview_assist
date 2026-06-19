@@ -13,7 +13,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@interview-assistant/shared": "0.1.0",
     "@supabase/supabase-js": "^2.45.4",
     "mammoth": "^1.8.0",
     "pdf-parse": "^1.1.1",
@@ -24,6 +23,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@interview-assistant/shared": "0.1.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/ws": "^8.5.12",

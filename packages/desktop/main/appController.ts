@@ -94,16 +94,19 @@ export function resolveEnvironment(
 }
 
 /**
- * Read the build-time baked `MAIN_VITE_APP_ENV` (electron-vite inlines
- * `MAIN_VITE_*` into the main bundle as `import.meta.env.MAIN_VITE_*`).
- *
- * Access is guarded so it is safe everywhere this runs:
- * - Packaged build: `import.meta.env.MAIN_VITE_APP_ENV` is an inlined literal.
- * - Local `tsx`/Node run or vitest: `import.meta.env` may be undefined → `undefined`.
+ * Read the build-time baked `MAIN_VITE_APP_ENV` (electron-vite inlines it into
+ * the main bundle). MUST use DIRECT static `import.meta.env.MAIN_VITE_APP_ENV`
+ * access — that is the only form Vite/electron-vite replaces with the literal
+ * value at build time, so a packaged `dev` installer actually resolves to `dev`
+ * (Req 4.2, 4.4). Wrapped so non-built runtimes (bare tsx/Node) never throw;
+ * under vitest it resolves to `undefined`.
  */
 function bakedAppEnv(): string | undefined {
-  const meta = import.meta as unknown as { env?: Record<string, string | undefined> }
-  return meta.env?.['MAIN_VITE_APP_ENV']
+  try {
+    return import.meta.env.MAIN_VITE_APP_ENV
+  } catch {
+    return undefined
+  }
 }
 
 const REQUEST_CHANNELS = [
