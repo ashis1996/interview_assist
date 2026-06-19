@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+
+# Secrets / local config — never commit real keys
+.env
+.env.*
+!.env.example

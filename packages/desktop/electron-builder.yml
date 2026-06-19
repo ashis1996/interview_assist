@@ -1,0 +1,28 @@
+appId: ai.interviewassistant.desktop
+productName: Interview Assistant
+directories:
+  output: dist
+  buildResources: build
+# `files` filters the app directory: only the electron-vite build output (out/**)
+# and package.json are packaged. Dev-only TypeScript sources, tests, and configs
+# live OUTSIDE out/, so they are excluded from the artifact (Req 3.3).
+#
+# Runtime dependencies are handled SEPARATELY from `files`: electron-builder
+# automatically bundles the production `dependencies` from package.json (and their
+# node_modules) into the app. This is required because electron-vite externalizes
+# runtime deps (ws, @supabase/supabase-js, pdf-parse, mammoth, react, ...) via
+# externalizeDepsPlugin — they are NOT bundled into out/ and must resolve from
+# node_modules at runtime. The workspace package @interview-assistant/shared is
+# excluded from externalize and BUNDLED by electron-vite, so it is NOT required as
+# a packaged runtime dependency (its TS source compiles into out/).
+files:
+  - "out/**"
+  - "package.json"
+win:
+  target: nsis
+  icon: build/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: "${productName}-Setup-${version}.exe"

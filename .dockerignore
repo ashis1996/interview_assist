@@ -1,0 +1,44 @@
+# .dockerignore for the backend image build (context = repo root).
+#
+# Keeps the build context lean. Dependencies are reinstalled inside the image
+# via `npm ci`, and build artifacts/secrets are never shipped. Do NOT add
+# packages/shared, packages/backend, or package-lock.json here — they are
+# required to build the backend image.
+
+# Installed dependencies (reinstalled in the image)
+node_modules
+**/node_modules
+
+# Build outputs / artifacts
+out
+**/out
+dist
+**/dist
+
+# Desktop packaging artifacts (not part of the backend image)
+packages/desktop/build/*.exe
+packages/desktop/build/*.blockmap
+packages/desktop/release
+
+# Secrets & local env — never bake into the image
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+*.log
+**/*.log
+
+# VCS, editor, and tooling metadata
+.git
+.gitignore
+.gitattributes
+.vscode
+.kiro
+.DS_Store
+
+# Docs / specs (not needed at runtime)
+docs

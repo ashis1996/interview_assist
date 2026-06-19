@@ -1,0 +1,21 @@
+{
+  "name": "@interview-assistant/shared",
+  "version": "0.1.0",
+  "description": "Pure domain logic, shared types, and the client<->backend session protocol for the Interview Assistant SaaS.",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./domain/*": "./domain/*.ts",
+    "./protocol": "./protocol.ts",
+    "./credits": "./credits.ts",
+    "./types": "./types.ts",
+    "./mappings": "./mappings.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "license": "MIT"
+}

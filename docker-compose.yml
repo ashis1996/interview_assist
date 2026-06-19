@@ -1,0 +1,25 @@
+# Local Postgres for development. No Supabase or cloud cost required for the
+# `local` environment (auth + credits are bypassed there).
+#
+#   docker compose up -d
+#
+# The schema is applied automatically on first start via the init mount below.
+# Connection string for packages/backend/.env:
+#   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/interview_assistant
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ia-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: interview_assistant
+    ports:
+      - '5432:5432'
+    volumes:
+      - ia-pgdata:/var/lib/postgresql/data
+      - ./packages/backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+volumes:
+  ia-pgdata:

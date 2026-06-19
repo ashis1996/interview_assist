@@ -1,0 +1,32 @@
+{
+  "name": "@interview-assistant/backend",
+  "version": "0.1.0",
+  "description": "Cloud backend for the Interview Assistant SaaS: auth verification, credits/metering, the realtime session gateway, and persistence.",
+  "type": "module",
+  "main": "./index.ts",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "tsx index.ts",
+    "migrate": "tsx db/migrate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@interview-assistant/shared": "0.1.0",
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@deepgram/sdk": "^3.9.0",
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "jose": "^5.9.6",
+    "openai": "^6.42.0",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.2"
+  },
+  "license": "MIT"
+}
