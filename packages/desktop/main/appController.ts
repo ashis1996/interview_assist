@@ -43,6 +43,8 @@ import {
   IPC_OVERLAY_SET_COLLAPSED,
   IPC_OVERLAY_SET_CONTENT_HEIGHT,
   IPC_OVERLAY_SET_CLICKTHROUGH,
+  IPC_OVERLAY_MOVE_BY,
+  IPC_APP_QUIT,
   IPC_EVT_TRANSCRIPT,
   IPC_EVT_FINAL_QUESTION,
   IPC_EVT_TOPICS,
@@ -344,6 +346,10 @@ export class AppController {
     ipcMain.on(IPC_OVERLAY_SET_CONTENT_HEIGHT, (_e, height: number) =>
       this.windowManager.setContentHeight(height)
     )
+    ipcMain.on(IPC_OVERLAY_MOVE_BY, (_e, delta: { dx: number; dy: number }) =>
+      this.windowManager.moveBy(delta?.dx ?? 0, delta?.dy ?? 0)
+    )
+    ipcMain.on(IPC_APP_QUIT, () => app.quit())
   }
 
   private envState(): EnvState {
@@ -418,6 +424,8 @@ export class AppController {
     for (const channel of REQUEST_CHANNELS) ipcMain.removeHandler(channel)
     ipcMain.removeAllListeners(IPC_AUDIO_FRAME)
     ipcMain.removeAllListeners(IPC_OVERLAY_SET_CONTENT_HEIGHT)
+    ipcMain.removeAllListeners(IPC_OVERLAY_MOVE_BY)
+    ipcMain.removeAllListeners(IPC_APP_QUIT)
   }
 
   recreateWindowIfNeeded(): void {

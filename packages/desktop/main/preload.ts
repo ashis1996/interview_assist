@@ -28,6 +28,8 @@ import {
   IPC_OVERLAY_SET_COLLAPSED,
   IPC_OVERLAY_SET_CONTENT_HEIGHT,
   IPC_OVERLAY_SET_CLICKTHROUGH,
+  IPC_OVERLAY_MOVE_BY,
+  IPC_APP_QUIT,
   IPC_EVT_TRANSCRIPT,
   IPC_EVT_FINAL_QUESTION,
   IPC_EVT_TOPICS,
@@ -93,6 +95,8 @@ const api = {
   setCollapsed: (collapsed: boolean) => ipcRenderer.invoke(IPC_OVERLAY_SET_COLLAPSED, collapsed),
   setContentHeight: (height: number) => ipcRenderer.send(IPC_OVERLAY_SET_CONTENT_HEIGHT, height),
   setClickThrough: (enabled: boolean) => ipcRenderer.invoke(IPC_OVERLAY_SET_CLICKTHROUGH, enabled),
+  moveOverlayBy: (dx: number, dy: number) => ipcRenderer.send(IPC_OVERLAY_MOVE_BY, { dx, dy }),
+  quitApp: () => ipcRenderer.send(IPC_APP_QUIT),
 
   // Pushed events: subscribe with an unsubscribe function.
   on(channel: (typeof EVENT_CHANNELS)[number], listener: (payload: unknown) => void): () => void {

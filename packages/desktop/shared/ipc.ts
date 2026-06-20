@@ -37,6 +37,8 @@ export const IPC_PRIVATE_MODE_SET = 'overlay:setPrivateMode'
 export const IPC_OVERLAY_SET_COLLAPSED = 'overlay:setCollapsed'
 export const IPC_OVERLAY_SET_CONTENT_HEIGHT = 'overlay:setContentHeight'
 export const IPC_OVERLAY_SET_CLICKTHROUGH = 'overlay:setClickThrough'
+export const IPC_OVERLAY_MOVE_BY = 'overlay:moveBy'
+export const IPC_APP_QUIT = 'app:quit'
 export const IPC_SCREENSHOT = 'interview:screenshot'
 
 // --- Pushed events (gateway -> renderer) -----------------------------------

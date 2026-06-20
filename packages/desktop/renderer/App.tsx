@@ -5,10 +5,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import type { Environment, Profile } from '@interview-assistant/shared'
-import { SignInScreen, CreditBadge, OnboardingForm, type DesktopApi } from './screens'
+import { SignInScreen, CreditBadge, OnboardingForm, StartSession, type DesktopApi } from './screens'
 import { Overlay } from './Overlay'
 import { CollapsedPill } from './components/CollapsedPill'
-import { CollapseIcon } from './icons'
+import { Logo } from './components/Logo'
+import { CollapseIcon, CloseIcon } from './icons'
 import { collapseView, type Phase } from './collapseView'
 
 function isBypassed(env: Environment | null): boolean {
@@ -36,6 +37,11 @@ export function App(): React.JSX.Element {
   // 8.1, 8.2). `phase` is intentionally NOT touched on collapse/expand, so the
   // previously active screen reappears on expand (Req 8.3, 8.6).
   const [collapsed, setCollapsed] = useState(false)
+  // Within the authenticated "ready" phase the user first sees the Start
+  // Session screen (pick session type), then the onboarding form. Kept as a
+  // sub-step rather than a top-level phase so the collapse/pill logic and its
+  // unit tests stay unchanged. Reset to 'start' whenever we return to ready.
+  const [readyStep, setReadyStep] = useState<'start' | 'onboarding'>('start')
 
   // Collapse/expand handlers. The window resize side-effect lives in the main
   // process via `setCollapsed`; content protection is a window property that is
@@ -86,8 +92,12 @@ export function App(): React.JSX.Element {
   // `setCollapsed` in the main process (Req 8.2).
   useEffect(() => {
     if (collapsed) return
-    if (phase !== 'interview') window.api.setContentHeight(720)
-  }, [phase, collapsed])
+    if (phase === 'interview') return
+    // The compact Start Session screen needs far less height than the tall
+    // onboarding form / sign-in; size the window to the active step.
+    const compact = phase === 'ready' && readyStep === 'start'
+    window.api.setContentHeight(compact ? 300 : 720)
+  }, [phase, collapsed, readyStep])
 
   // Collapsed: render ONLY the floating pill at the app level, regardless of
   // phase, so minimize works on every screen. The decision is delegated to the
@@ -97,7 +107,7 @@ export function App(): React.JSX.Element {
   // prior screen (Req 8.1, 8.2, 8.3, 8.6).
   if (collapseView(collapsed, phase) === 'pill') {
     return (
-      <div className="app">
+      <div className="app app--pill">
         <CollapsedPill onExpand={expand} />
       </div>
     )
@@ -109,64 +119,107 @@ export function App(): React.JSX.Element {
   // an unintended environment (Req 9.3). The env indicator may still show.
   if (configError) {
     return (
-      <div className="app">
-        <div className="topbar">
-          {env && env !== 'prod' && (
-            <span className="env-indicator" data-testid="env-indicator">
-              {env}
-            </span>
-          )}
-        </div>
-        <div className="config-error" data-testid="config-error" role="alert">
-          <h2>Can't reach the configured backend</h2>
-          <p>{configError}</p>
+      <div className="app app--page">
+        <PageHeader env={env} onCollapse={collapse} />
+        <div className="page-body">
+          <div className="config-error" data-testid="config-error" role="alert">
+            <h2>Can't reach the configured backend</h2>
+            <p>{configError}</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`app${phase === 'interview' ? ' app--overlay' : ''}`}>
+    <div className={`app${phase === 'interview' ? ' app--overlay' : ' app--page'}`}>
       {phase !== 'interview' && (
-        <div className="topbar">
-          {/* Dev-only indicator; prod users see nothing. */}
-          {env && env !== 'prod' && (
-            <span className="env-indicator" data-testid="env-indicator">
-              {env}
-            </span>
+        <PageHeader
+          env={env}
+          balance={phase === 'ready' ? balance : undefined}
+          onCollapse={collapse}
+        />
+      )}
+
+      {phase !== 'interview' && (
+        <div className="page-body">
+          {phase === 'loading' && <p className="page-loading">Loading…</p>}
+          {phase === 'auth' && <SignInScreen api={api} onSignedIn={() => void afterAuthed()} />}
+          {phase === 'ready' && readyStep === 'start' && (
+            <StartSession balance={balance} onCreateFree={() => setReadyStep('onboarding')} />
           )}
-          {phase === 'ready' && <CreditBadge balance={balance} />}
-          {/* Always-present minimize-to-pill control for the non-interview
-              screens (sign-in / onboarding / ready). The interview overlay keeps
-              its own in-toolbar collapse button, routed to this same handler via
-              the `onCollapse` prop. (Req 8.1, 8.2) */}
-          <button
-            className="topbar-collapse"
-            data-testid="minimize-pill"
-            onClick={collapse}
-            title="Collapse to pill"
-            aria-label="Collapse to pill"
-          >
-            <CollapseIcon size={16} />
-          </button>
+          {phase === 'ready' && readyStep === 'onboarding' && (
+            <div className="ready">
+              <OnboardingForm
+                initial={savedProfile}
+                onBack={() => setReadyStep('start')}
+                onStart={(profile) =>
+                  void api.startInterview(profile).then((r) => {
+                    if (r.ok) setPhase('interview')
+                  })
+                }
+              />
+            </div>
+          )}
         </div>
       )}
 
-      {phase === 'loading' && <p>Loading…</p>}
-      {phase === 'auth' && <SignInScreen api={api} onSignedIn={() => void afterAuthed()} />}
-      {phase === 'ready' && (
-        <div className="ready">
-          <OnboardingForm
-            initial={savedProfile}
-            onStart={(profile) =>
-              void api.startInterview(profile).then((r) => {
-                if (r.ok) setPhase('interview')
-              })
-            }
-          />
-        </div>
+      {phase === 'interview' && (
+        <Overlay
+          onEnded={() => {
+            setReadyStep('start')
+            setPhase('ready')
+          }}
+          onCollapse={collapse}
+        />
       )}
-      {phase === 'interview' && <Overlay onEnded={() => setPhase('ready')} onCollapse={collapse} />}
+    </div>
+  )
+}
+
+/**
+ * Polished SaaS header for the non-interview (solid, light-themed) screens:
+ * the product brand on the left, and the window controls (credit badge,
+ * dev-only environment indicator, collapse-to-peach, and close) on the right.
+ * The header doubles as a drag handle to reposition the frameless window; the
+ * control buttons opt out of the drag region so they stay clickable.
+ */
+function PageHeader(props: {
+  env: Environment | null
+  balance?: number
+  onCollapse: () => void
+}): React.JSX.Element {
+  return (
+    <div className="page-header">
+      <div className="page-brand">
+        <Logo size={22} />
+        <span className="page-brand-name">AI Assist</span>
+      </div>
+      <div className="page-header-controls">
+        {props.env && props.env !== 'prod' && (
+          <span className="env-indicator" data-testid="env-indicator">
+            {props.env}
+          </span>
+        )}
+        {typeof props.balance === 'number' && <CreditBadge balance={props.balance} />}
+        <button
+          className="hdr-btn"
+          data-testid="minimize-pill"
+          onClick={props.onCollapse}
+          title="Minimize to peach"
+          aria-label="Minimize to peach"
+        >
+          <CollapseIcon size={15} />
+        </button>
+        <button
+          className="hdr-btn hdr-btn--close"
+          onClick={() => window.api.quitApp()}
+          title="Close"
+          aria-label="Close"
+        >
+          <CloseIcon size={15} />
+        </button>
+      </div>
     </div>
   )
 }

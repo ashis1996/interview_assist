@@ -114,6 +114,71 @@ export function CreditBadge(props: { balance: number; low?: boolean }): React.JS
   )
 }
 
+/**
+ * Start Session screen — the first screen after sign-in/ready. The user picks a
+ * session type (free trial today; paid via credits later) before moving on to
+ * the onboarding form. Inspired by the product mock but kept to the features we
+ * actually ship: a Create / Past Sessions toggle and a session-type chooser.
+ * "Create free session" advances to onboarding; "Buy Credits" is a placeholder
+ * for the upcoming billing flow.
+ */
+export function StartSession(props: {
+  balance: number
+  onCreateFree: () => void
+  onBuyCredits?: () => void
+}): React.JSX.Element {
+  const [tab, setTab] = useState<'create' | 'past'>('create')
+
+  return (
+    <div className="start-session">
+      <div className="ss-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={tab === 'create'}
+          className={`ss-tab${tab === 'create' ? ' on' : ''}`}
+          onClick={() => setTab('create')}
+        >
+          Create
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === 'past'}
+          className={`ss-tab${tab === 'past' ? ' on' : ''}`}
+          onClick={() => setTab('past')}
+        >
+          Past Sessions
+        </button>
+      </div>
+
+      {tab === 'create' ? (
+        <div className="ss-create">
+          <div className="ss-label">Select session type</div>
+          <div className="ss-types">
+            <button className="ss-type" onClick={props.onCreateFree}>
+              <span className="ss-type-name">Free Session</span>
+              <span className="ss-type-meta">10 min</span>
+            </button>
+            <button
+              className="ss-type ss-type--primary"
+              onClick={props.onBuyCredits}
+              disabled={!props.onBuyCredits}
+              title="Coming soon"
+            >
+              Buy Credits
+            </button>
+          </div>
+          <p className="ss-hint">You have {props.balance} credits. Free sessions last 10 minutes.</p>
+        </div>
+      ) : (
+        <div className="ss-past-empty">
+          <p>No past sessions yet.</p>
+          <span>Your completed interview sessions will show up here.</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function deriveSeniority(years: number): SeniorityLevel {
   if (years <= 2) return 'Junior'
   if (years <= 5) return 'Mid'
@@ -129,6 +194,7 @@ function deriveSeniority(years: number): SeniorityLevel {
  */
 export function OnboardingForm(props: {
   onStart: (profile: Profile) => void
+  onBack?: () => void
   initial?: Profile | null
 }): React.JSX.Element {
   const init = props.initial ?? null
@@ -299,9 +365,16 @@ export function OnboardingForm(props: {
         </small>
       </label>
 
-      <button className="ob-start" disabled={!canStart || busy} onClick={submit}>
-        Start interview
-      </button>
+      <div className="ob-footer">
+        {props.onBack && (
+          <button className="ob-back" type="button" onClick={props.onBack} disabled={busy}>
+            ← Back
+          </button>
+        )}
+        <button className="ob-start" disabled={!canStart || busy} onClick={submit}>
+          Start interview
+        </button>
+      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@
 // Google OAuth. No embedded webview is ever used.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
 import type { SupabaseAuthAdapter } from './authManager'
 import type { Tokens } from './tokenStore'
 import { createPkcePair, loopbackRedirectUri } from './pkce'
@@ -34,6 +35,12 @@ export interface SupabaseAuthAdapterOptions {
 export function createSupabaseAuthAdapter(opts: SupabaseAuthAdapterOptions): SupabaseAuthAdapter {
   const client: SupabaseClient = createClient(opts.supabaseUrl, opts.publishableKey, {
     auth: { flowType: 'pkce', persistSession: false, autoRefreshToken: false },
+    // Electron runs on Node 20 (no global WebSocket). @supabase/supabase-js
+    // eagerly constructs a Realtime client in createClient() and throws on
+    // Node < 22 unless given a WebSocket transport. We don't use Realtime, but
+    // we must supply `ws` so createClient doesn't throw (which would abort the
+    // whole environment setup). `ws` is bundled into the main process.
+    realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
   })
   const port = opts.loopbackPort ?? 53682
 

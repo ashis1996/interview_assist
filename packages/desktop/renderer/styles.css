@@ -29,6 +29,7 @@ body,
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: var(--fg);
   background: transparent;
+  overflow: hidden;
 }
 
 .app {
@@ -50,6 +51,20 @@ body,
   background: transparent;
   backdrop-filter: none;
   border-radius: 0;
+}
+
+/* Collapsed (minimized) shell: the floating peach is the entire UI. The outer
+ * shell must be fully transparent with NO padding/box/blur so only the artwork
+ * shows on the desktop, and clipped so the small window never shows scrollbars. */
+.app--pill {
+  padding: 0;
+  gap: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Top bar: environment + credits. */
@@ -871,26 +886,27 @@ kbd {
   word-break: break-word;
 }
 
-/* Collapsed floating logo pill (draggable, screen-share invisible). */
+/* Collapsed floating mark (draggable, screen-share invisible).
+   No pill/circle chrome — the product artwork (peach) IS the floating button,
+   shown on a transparent background exactly as provided. */
 .pk-pill {
-  -webkit-app-region: drag;
+  -webkit-app-region: no-drag;
   width: 56px;
   height: 56px;
   margin: 2px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  background: radial-gradient(circle at 32% 28%, #93a8ff, #5b76f0 70%, #4a61d8);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 10px 26px rgba(40, 60, 180, 0.55), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+  background: transparent;
+  border: none;
+  box-shadow: none;
   position: relative;
-  cursor: move;
+  cursor: grab;
+  touch-action: none;
   animation: pk-pill-in 0.25s ease;
 }
-.pk-pill:hover {
-  box-shadow: 0 12px 30px rgba(40, 60, 180, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+.pk-pill:active {
+  cursor: grabbing;
 }
 @keyframes pk-pill-in {
   from {
@@ -902,28 +918,331 @@ kbd {
     opacity: 1;
   }
 }
-.pk-pill > svg {
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+.pk-pill > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
-.pk-pill-expand {
+
+
+
+/* ===== Light, solid SaaS theme — non-interview screens ==================
+ * Only the interview overlay stays transparent/dark (.app--overlay) and the
+ * collapsed peach is bare (.app--pill). Everything else (sign-in, onboarding,
+ * ready, config-error) renders as a clean white card with a branded header,
+ * modern inputs, and a dark primary action — matching the product mock. */
+.app--page {
+  --fg: #1b2330;
+  --muted: #6b7787;
+  --bg-solid: #ffffff;
+  --line: #e6e8ee;
+  --line-strong: #d6dae3;
+  --ring: rgba(99, 102, 241, 0.35);
+  color-scheme: light;
+  background: #ffffff;
+  color: var(--fg);
+  backdrop-filter: none;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 50px rgba(20, 25, 40, 0.18);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Branded, draggable header. */
+.page-header {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+}
+.page-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #11151c;
+  letter-spacing: -0.01em;
+}
+.page-header-controls {
   -webkit-app-region: no-drag;
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(20, 22, 30, 0.95);
-  color: #fff;
-  font-size: 11px;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app--page .hdr-btn {
+  -webkit-app-region: no-drag;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  background: #ffffff;
+  color: #5b6675;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
 }
-.pk-pill-expand:hover {
-  background: rgba(40, 44, 58, 1);
+.app--page .hdr-btn:hover {
+  background: #f3f4f7;
+  filter: none;
+}
+.app--page .hdr-btn--close {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+.app--page .hdr-btn--close:hover {
+  background: #dc2626;
 }
 
+/* Body scroll area. */
+.page-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.page-loading {
+  padding: 24px;
+  color: var(--muted);
+}
+.app--page .ready {
+  display: block;
+  overflow: visible;
+}
+
+/* Onboarding — light. */
+.app--page .onboarding {
+  max-width: none;
+  padding: 16px 22px 20px;
+}
+.app--page .onboarding h1 {
+  color: #11151c;
+  font-size: 18px;
+  font-weight: 700;
+}
+.app--page .onboarding-sub {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.app--page .ob-field > span {
+  color: #2a3340;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.app--page .ob-field input,
+.app--page .ob-field select,
+.app--page .ob-field textarea,
+.app--page .sign-in input {
+  background: #ffffff;
+  color: #11151c;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.app--page .ob-field input::placeholder,
+.app--page .ob-field textarea::placeholder,
+.app--page .sign-in input::placeholder {
+  color: #9aa3b0;
+}
+.app--page .ob-field input:focus,
+.app--page .ob-field select:focus,
+.app--page .ob-field textarea:focus,
+.app--page .sign-in input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+.app--page .ob-chip {
+  background: #f4f5f8;
+  color: #404a59;
+  border: 1px solid var(--line-strong);
+}
+.app--page .ob-chip.on {
+  background: #11151c;
+  color: #ffffff;
+  border-color: #11151c;
+}
+.app--page .ob-file {
+  border: 1px dashed var(--line-strong) !important;
+  color: #6b7787;
+  background: #fafbfc !important;
+}
+.app--page .ob-hint {
+  color: var(--muted);
+}
+
+/* Buttons — dark primary like the mock. */
+.app--page button {
+  background: #11151c;
+  color: #ffffff;
+  border: 0;
+  font-weight: 600;
+}
+.app--page button:hover {
+  filter: brightness(1.25);
+}
+.app--page .ob-start {
+  background: #11151c;
+  border-radius: 12px;
+  padding: 12px;
+}
+/* Secondary (Google sign-in) → outlined. */
+.app--page .sign-in button[type='button'] {
+  background: #ffffff;
+  color: #11151c;
+  border: 1px solid var(--line-strong);
+}
+.app--page .sign-in button[type='button']:hover {
+  background: #f3f4f7;
+  filter: none;
+}
+
+/* Badges on the light header. */
+.app--page .credit-badge {
+  background: #e9f7ee;
+  color: #1f8a3b;
+}
+.app--page .credit-badge.low {
+  background: #fdecec;
+  color: #d23b3b;
+}
+.app--page .env-indicator {
+  background: #eef0ff;
+  color: #4f46e5;
+}
+
+/* Auth + config-error on light. */
+.app--page .sign-in h1 {
+  color: #11151c;
+}
+.app--page .auth-error {
+  background: #fdecec;
+  color: #d23b3b;
+}
+.app--page .config-error {
+  padding: 28px 22px;
+  color: #11151c;
+}
+
+
+/* ===== Start Session screen (light) ==================================== */
+.app--page .start-session {
+  padding: 16px 22px 20px;
+}
+.app--page .ss-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: #f1f2f5;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 18px;
+}
+.app--page .ss-tab {
+  background: transparent;
+  color: #6b7787;
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 10px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.app--page .ss-tab:hover {
+  filter: none;
+}
+.app--page .ss-tab.on {
+  background: #ffffff;
+  color: #11151c;
+  box-shadow: 0 1px 3px rgba(20, 25, 40, 0.12);
+}
+.app--page .ss-label {
+  font-weight: 700;
+  color: #11151c;
+  font-size: 14px;
+  margin: 2px 0 10px;
+}
+.app--page .ss-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.app--page .ss-type {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ffffff;
+  color: #11151c;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 16px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.app--page .ss-type:hover {
+  background: #f7f8fa;
+  filter: none;
+}
+.app--page .ss-type-meta {
+  color: #1f8a3b;
+  font-weight: 600;
+}
+.app--page .ss-type--primary {
+  background: #11151c;
+  color: #ffffff;
+  border-color: #11151c;
+}
+.app--page .ss-type--primary:hover {
+  background: #000000;
+  filter: none;
+}
+.app--page .ss-type--primary:disabled {
+  opacity: 0.55;
+}
+.app--page .ss-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 14px 0 0;
+}
+.app--page .ss-past-empty {
+  text-align: center;
+  padding: 30px 12px;
+  color: var(--muted);
+}
+.app--page .ss-past-empty p {
+  color: #11151c;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+/* Onboarding footer: Back (outline) + Start (dark primary). */
+.app--page .ob-footer {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+.app--page .ob-back {
+  flex: 0 0 auto;
+  background: #ffffff;
+  color: #11151c;
+  border: 1px solid var(--line-strong);
+}
+.app--page .ob-back:hover {
+  background: #f3f4f7;
+  filter: none;
+}
+.app--page .ob-footer .ob-start {
+  flex: 1;
+  width: auto;
+  margin-top: 0;
+}

@@ -10,6 +10,41 @@
 import type { Environment } from '@interview-assistant/shared'
 import type { TokenStore, Tokens } from './tokenStore'
 
+/**
+ * Decode a JWT's `exp` (seconds since epoch) without verifying the signature —
+ * the gateway verifies; here we only need to know whether to refresh first.
+ * Returns null when the token isn't a parseable JWT.
+ */
+function decodeJwtExpSeconds(token: string): number | null {
+  const parts = token.split('.')
+  if (parts.length < 2) return null
+  try {
+    const b64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/')
+    const json = Buffer.from(b64, 'base64').toString('utf8')
+    const payload = JSON.parse(json) as { exp?: number }
+    return typeof payload.exp === 'number' ? payload.exp : null
+  } catch {
+    return null
+  }
+}
+
+/** Refresh slightly BEFORE the real expiry to absorb clock skew + request latency. */
+const EXPIRY_SKEW_MS = 60_000
+
+/**
+ * Default access-token expiry check used in production: parse the JWT `exp`
+ * claim and treat the token as expired once it is within {@link EXPIRY_SKEW_MS}
+ * of expiring. This is what makes silent refresh actually fire — without it the
+ * gateway receives a stale token and rejects auth with an `"exp" claim` error.
+ * If the token isn't a parseable JWT we assume it's still valid and let the
+ * gateway/refresh path decide.
+ */
+export function defaultIsAccessTokenExpired(tokens: Tokens): boolean {
+  const exp = decodeJwtExpSeconds(tokens.accessToken)
+  if (exp === null) return false
+  return exp * 1000 <= Date.now() + EXPIRY_SKEW_MS
+}
+
 /** Result of an authentication attempt. */
 export type AuthResult =
   | { ok: true; tokens: Tokens }
@@ -54,7 +89,7 @@ export class AuthManager {
     this.env = opts.environment
     this.store = opts.tokenStore
     this.adapter = opts.adapter
-    this.isExpired = opts.isAccessTokenExpired ?? (() => false)
+    this.isExpired = opts.isAccessTokenExpired ?? defaultIsAccessTokenExpired
   }
 
   /** Email/password sign-in. Errors are masked generically (Req 1.4). */

@@ -252,6 +252,18 @@ export class WindowManager extends EventEmitter {
       height: Math.round(c.height),
     })
   }
+
+  /**
+   * Move the window by a screen-space delta. Used to drag the collapsed peach
+   * widget around the desktop from the renderer (which reports cursor deltas),
+   * since the frameless/transparent window has no native title bar to grab.
+   */
+  moveBy(dx: number, dy: number): void {
+    const win = this.win
+    if (!win || win.isDestroyed()) return
+    const [x, y] = win.getPosition()
+    win.setPosition(Math.round(x + dx), Math.round(y + dy))
+  }
   applySize(size: Size): void {
     const win = this.win
     if (!win || win.isDestroyed()) return
