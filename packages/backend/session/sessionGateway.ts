@@ -126,6 +126,9 @@ class Connection {
       case 'set_auto_generate':
         this.orchestrator?.setAutoGenerate(msg.enabled)
         break
+      case 'set_coding_mode':
+        this.orchestrator?.setCodingMode(msg.enabled)
+        break
       case 'screenshot_question':
         // Vision answer for an on-screen question. Fire-and-forget like text;
         // the generation-seq guard makes the latest request win.

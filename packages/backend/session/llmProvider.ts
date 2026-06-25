@@ -448,6 +448,8 @@ export function createLlmProvider(
       const useVision = Boolean(req.imageBase64)
       const chosen = useVision ? visionBackend : backend
       const chosenProvider = useVision ? visionProvider : provider
+      // eslint-disable-next-line no-console
+      console.log(`[llm] generate via ${chosenProvider} (${useVision ? 'vision/screenshot' : 'text'})`)
       const result = await runWithTimeout(chosenProvider, timeoutMs, clock, (signal) =>
         chosen.stream(req, onToken, signal)
       )

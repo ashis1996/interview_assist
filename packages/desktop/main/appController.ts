@@ -36,6 +36,7 @@ import {
   IPC_PIPELINE_SUBMIT_TEXT,
   IPC_PIPELINE_ANSWER,
   IPC_SET_AUTO_GENERATE,
+  IPC_SET_CODING_MODE,
   IPC_PIPELINE_REGENERATE,
   IPC_PIPELINE_COPY,
   IPC_OVERLAY_SET_OPACITY,
@@ -127,6 +128,7 @@ const REQUEST_CHANNELS = [
   IPC_PIPELINE_SUBMIT_TEXT,
   IPC_PIPELINE_ANSWER,
   IPC_SET_AUTO_GENERATE,
+  IPC_SET_CODING_MODE,
   IPC_PIPELINE_REGENERATE,
   IPC_PIPELINE_COPY,
   IPC_OVERLAY_SET_OPACITY,
@@ -327,6 +329,9 @@ export class AppController {
     ipcMain.handle(IPC_PIPELINE_ANSWER, () => this.sessionClient?.sendAnswer())
     ipcMain.handle(IPC_SET_AUTO_GENERATE, (_e, enabled: boolean) =>
       this.sessionClient?.sendAutoGenerate(enabled)
+    )
+    ipcMain.handle(IPC_SET_CODING_MODE, (_e, enabled: boolean) =>
+      this.sessionClient?.sendCodingMode(enabled)
     )
     ipcMain.handle(IPC_PIPELINE_REGENERATE, () => this.sessionClient?.sendRegenerate())
     ipcMain.handle(IPC_PIPELINE_COPY, (): string => {

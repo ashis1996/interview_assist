@@ -71,6 +71,7 @@ export class SessionOrchestrator {
   private generationSeq = 0
   private exhausted = false
   private autoGenerate = false
+  private codingMode = false
   private hasPending = false
   /** Rolling conversational memory: recent (question -> answer) turns. */
   private readonly history: LlmTurn[] = []
@@ -85,6 +86,11 @@ export class SessionOrchestrator {
   setAutoGenerate(enabled: boolean): void {
     this.autoGenerate = enabled
     if (enabled && this.hasPending) void this.answerPending()
+  }
+
+  /** Enable/disable Coding mode: when on, answers are forced code-first. */
+  setCodingMode(enabled: boolean): void {
+    this.codingMode = enabled
   }
 
   /**
@@ -167,9 +173,10 @@ export class SessionOrchestrator {
   ): Promise<void> {
     // For a screenshot question, instruct the vision model to read the question
     // FROM the image (the `question` text is only a placeholder/label).
+    const base = buildSystemPrompt(this.d.profile, scope, { forceCoding: this.codingMode })
     const systemPrompt = image
-      ? `${buildSystemPrompt(this.d.profile, scope)}\n\nThe user has shared a SCREENSHOT of an interview question (it may be a coding task, multiple-choice question, system-design prompt, or written question). Read the question directly from the image and answer it as the candidate. If it is multiple choice, state the correct option and briefly why.`
-      : buildSystemPrompt(this.d.profile, scope)
+      ? `${base}\n\nThe user has shared a SCREENSHOT of an interview question (it may be a coding task, multiple-choice question, system-design prompt, or written question). Read the question directly from the image and answer it as the candidate. If it is multiple choice, state the correct option and briefly why.`
+      : base
     const seq = ++this.generationSeq
 
     // Pass prior turns as context. For a regenerate of the current question,

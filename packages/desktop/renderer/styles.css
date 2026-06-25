@@ -499,6 +499,17 @@ a,
   padding: 2px 7px;
   border-radius: 999px;
 }
+.pk-codingbadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ffd36b;
+  background: rgba(255, 211, 107, 0.16);
+  border: 1px solid rgba(255, 211, 107, 0.4);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
 kbd {
   font-size: 9.5px;
   padding: 1px 5px;

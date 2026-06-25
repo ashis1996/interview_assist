@@ -41,6 +41,39 @@ function parseBootstrapSuperuserEmails(raw: string | undefined): Set<string> {
   )
 }
 
+/**
+ * Infer the LLM provider from a model id when the provider isn't set explicitly.
+ * Lets `DEFAULT_LLM_VISION_MODEL=gemini-2.5-flash` route to Gemini even if
+ * `DEFAULT_LLM_VISION_PROVIDER` was omitted. Falls back to undefined (caller
+ * then uses the text provider).
+ */
+function inferProviderFromModel(model: string | undefined): string | undefined {
+  if (!model) return undefined
+  const m = model.toLowerCase()
+  if (m.startsWith('gemini')) return 'gemini'
+  if (m.startsWith('claude')) return 'claude'
+  // Real OpenAI ids (gpt-4o, gpt-4.1, o3, ...) — but NOT Groq's "openai/gpt-oss".
+  if ((m.startsWith('gpt-') || m.startsWith('o1') || m.startsWith('o3') || m.startsWith('o4')) && !m.includes('/'))
+    return 'openai'
+  // llama-*, mixtral, meta-llama/*, openai/gpt-oss-* are served via Groq here.
+  if (m.includes('llama') || m.includes('mixtral') || m.includes('gpt-oss')) return 'groq'
+  return undefined
+}
+
+/** Select the API key matching a provider name. */
+function apiKeyForProvider(provider: string | undefined, secrets: ReturnType<typeof loadBackendConfig>['secrets']): string | undefined {
+  switch (provider) {
+    case 'openai':
+      return secrets.openaiApiKey
+    case 'gemini':
+      return secrets.geminiApiKey
+    case 'groq':
+      return secrets.groqApiKey
+    default:
+      return secrets.anthropicApiKey // claude
+  }
+}
+
 export async function startBackend(): Promise<void> {
   const config = loadBackendConfig()
   const pool = new Pool({ connectionString: config.databaseUrl })
@@ -103,26 +136,24 @@ export async function startBackend(): Promise<void> {
       ? createWhisperRelayFactory(config.secrets.openaiApiKey ?? '')
       : createDeepgramRelayFactory(config.secrets.deepgramApiKey ?? '')
 
-  const llmApiKey =
-    config.defaultLlmProvider === 'openai'
-      ? config.secrets.openaiApiKey
-      : config.defaultLlmProvider === 'gemini'
-        ? config.secrets.geminiApiKey
-        : config.defaultLlmProvider === 'groq'
-          ? config.secrets.groqApiKey
-          : config.secrets.anthropicApiKey
+  const llmApiKey = apiKeyForProvider(config.defaultLlmProvider, config.secrets)
 
-  // The vision (screenshot) provider may differ from the text provider, so it
-  // needs its own matching API key. Defaults to the text provider when unset.
-  const visionProvider = config.defaultLlmVisionProvider ?? config.defaultLlmProvider
-  const visionApiKey =
-    visionProvider === 'openai'
-      ? config.secrets.openaiApiKey
-      : visionProvider === 'gemini'
-        ? config.secrets.geminiApiKey
-        : visionProvider === 'groq'
-          ? config.secrets.groqApiKey
-          : config.secrets.anthropicApiKey
+  // The vision (screenshot) provider may differ from the text provider. Resolve
+  // it from the explicit env, else INFER it from the vision model id (so setting
+  // only DEFAULT_LLM_VISION_MODEL=gemini-... still routes to Gemini), else fall
+  // back to the text provider. Use that provider's own API key.
+  const visionProvider =
+    config.defaultLlmVisionProvider ??
+    inferProviderFromModel(config.defaultLlmVisionModel) ??
+    config.defaultLlmProvider
+  const visionApiKey = apiKeyForProvider(visionProvider, config.secrets)
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[backend] LLM text=${config.defaultLlmProvider}/${config.defaultLlmModel ?? '(default)'}` +
+      ` vision=${visionProvider}/${config.defaultLlmVisionModel ?? '(default)'}` +
+      ` (textKey=${llmApiKey ? 'set' : 'MISSING'}, visionKey=${visionApiKey ? 'set' : 'MISSING'})`
+  )
 
   const httpApp = buildHttpServer({
     environment: config.environment,
@@ -144,9 +175,7 @@ export async function startBackend(): Promise<void> {
         provider: config.defaultLlmProvider,
         ...(config.defaultLlmModel ? { model: config.defaultLlmModel } : {}),
         apiKey: llmApiKey,
-        ...(config.defaultLlmVisionProvider
-          ? { visionProvider: config.defaultLlmVisionProvider }
-          : {}),
+        visionProvider,
         ...(config.defaultLlmVisionModel ? { visionModel: config.defaultLlmVisionModel } : {}),
         ...(visionApiKey ? { visionApiKey } : {}),
       },

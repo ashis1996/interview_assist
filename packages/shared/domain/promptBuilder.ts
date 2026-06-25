@@ -18,7 +18,11 @@ import type { Profile, ScopeClassification } from '../types'
  * @param scope - How the current question relates to the candidate's roles.
  * @returns The fully assembled system prompt string.
  */
-export function buildSystemPrompt(profile: Profile, scope: ScopeClassification): string {
+export function buildSystemPrompt(
+  profile: Profile,
+  scope: ScopeClassification,
+  options: { forceCoding?: boolean } = {}
+): string {
   const { name, targetRole, seniority, roleCategories, skills, companyType, company, background } =
     profile
 
@@ -49,23 +53,37 @@ export function buildSystemPrompt(profile: Profile, scope: ScopeClassification):
     `You may be given earlier question/answer turns from this interview as context. Answer ONLY the most recent question; use the earlier turns just to resolve follow-ups and references (e.g. "how many does it have?" refers back to the previous topic).`,
     ``,
     `Adapt to the question type:`,
-    `- Technical: direct answer, then a brief explanation, a real-world example from my work, and one best practice.`,
+    `- Coding / DSA / algorithm / implementation (e.g. "write a function…", "given an array/string/tree…", "implement…", LeetCode/HackerRank-style, or a code problem shown in a screenshot): this is a CODE question — answer code-first (see the coding format below), NOT with prose bullets.`,
+    `- Technical (concept/definition/"how does X work"): direct answer, then a brief explanation, a real-world example from my work, and one best practice.`,
     `- Scenario / troubleshooting: how I would investigate, the likely root cause, the fix, and how I would prevent it.`,
     `- Behavioral: a tight STAR structure (Situation, Task, Action, Result), kept conversational.`,
     `- System design: clarify the requirement, give a high-level architecture, cover scaling/availability, and call out key trade-offs.`,
     ``,
-    `Style and format for a LIVE interview:`,
+    `Format for NON-CODING questions (live, spoken):`,
     `- Open with one direct sentence that answers the question head-on (no preamble like "Great question").`,
     `- Then 3 to 6 crisp Markdown bullet points, each starting with the key term in **bold** followed by a one- or two-sentence explanation.`,
     `- Speak in the first person from my experience ("In my current project...", "I'd first...", "From my experience...").`,
-    `- Include concrete technical detail (specific tools, commands, Big-O, trade-offs, numbers) and a short fenced code block only where it strengthens the point.`,
+    `- Include concrete technical detail (specific tools, commands, Big-O, trade-offs, numbers).`,
+    ``,
+    `Format for CODING questions (something I can read/paste, not narrate):`,
+    `- Lead with the COMPLETE, correct, runnable solution as a single fenced code block — code FIRST, no preamble or "speak aloud" framing.`,
+    `- After the code: one line of time/space complexity (e.g. "Time O(n), Space O(1)"), then 2–4 short bullets on the approach, key edge cases, and any follow-up optimization. Keep prose minimal.`,
+    `- Choose the language in this order: the language named in the question; else my primary language inferred from my skills/role; else Python. Use idiomatic, production-quality code with clear names and necessary edge-case handling.`,
+    ``,
+    `General:`,
     `- Be concise and granular — no filler, no repetition. Always provide an answer; never refuse or skip.`,
     `- Match the depth and sophistication to my seniority level of ${seniority}.`,
   ].join('\n')
 
   const scopeSection = buildScopeFraming(scope)
 
-  return [profileSection, backgroundSection, instructionSection, scopeSection]
+  // When the user forces Coding mode, remove all ambiguity: treat the current
+  // question as a coding problem and demand a code-first answer.
+  const codingDirective = options.forceCoding
+    ? `CODING MODE IS ON: treat the current question as a coding/implementation problem. Output a COMPLETE, correct, runnable solution as a fenced code block FIRST, then one line of time/space complexity and a brief approach. Do not lead with prose.`
+    : ''
+
+  return [profileSection, backgroundSection, instructionSection, scopeSection, codingDirective]
     .filter((s) => s.length > 0)
     .join('\n\n')
 }

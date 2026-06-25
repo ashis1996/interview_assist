@@ -70,6 +70,7 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
   const [chatOpen, setChatOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [autoGen, setAutoGen] = useState(false)
+  const [codingMode, setCodingMode] = useState(false)
   const [privateMode, setPrivateMode] = useState(true)
   const [opacity, setOpacity] = useState(95)
   const [elapsed, setElapsed] = useState(0)
@@ -261,6 +262,11 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
     setAutoGen(v)
     void window.api.setAutoGenerate(v)
   }
+  const toggleCodingMode = (): void => {
+    const v = !codingMode
+    setCodingMode(v)
+    void window.api.setCodingMode(v)
+  }
   const togglePrivate = (): void => {
     const v = !privateMode
     setPrivateMode(v)
@@ -309,6 +315,11 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
           <ChatIcon size={15} /> Chat
         </button>
         <span className="pk-timer">{formatElapsed(elapsed)}</span>
+        {codingMode && (
+          <span className="pk-codingbadge" title="Coding mode is ON — answers are code-first">
+            code
+          </span>
+        )}
         {stealth && (
           <span className="pk-stealth" title="Click-through is ON — toggle with Ctrl+Shift+Space">
             stealth
@@ -415,6 +426,10 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
           <label className="pk-row">
             <span>Auto Generate</span>
             <input type="checkbox" checked={autoGen} onChange={toggleAuto} />
+          </label>
+          <label className="pk-row">
+            <span>Coding mode (force code-first answers)</span>
+            <input type="checkbox" checked={codingMode} onChange={toggleCodingMode} />
           </label>
           <label className="pk-row">
             <span>Private (hidden in screen share)</span>

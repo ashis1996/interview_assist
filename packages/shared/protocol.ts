@@ -43,6 +43,8 @@ export type ClientToServer =
   | { type: 'answer' }
   // Toggle auto-answer: when on, each finalized question is answered immediately.
   | { type: 'set_auto_generate'; enabled: boolean }
+  // Toggle coding mode: when on, force code-first answers for the session.
+  | { type: 'set_coding_mode'; enabled: boolean }
   // Answer a question extracted from a screenshot via the vision model (Phase 2).
   | { type: 'screenshot_question'; imageBase64: string; mimeType: string }
   // Regenerate the answer for the current question.
@@ -97,6 +99,7 @@ const CLIENT_TYPES = new Set<ClientToServer['type']>([
   'text_question',
   'answer',
   'set_auto_generate',
+  'set_coding_mode',
   'screenshot_question',
   'regenerate',
   'stop_session',

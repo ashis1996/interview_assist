@@ -87,6 +87,7 @@ export class BackendSessionClient extends EventEmitter {
    */
   private desiredSession: ClientToServer | null = null
   private autoGenerate = false
+  private codingMode = false
   private captureState: { active: boolean; systemAudioAvailable: boolean } | null = null
 
   constructor(options: BackendSessionClientOptions) {
@@ -145,6 +146,7 @@ export class BackendSessionClient extends EventEmitter {
     if (this.desiredSession) {
       this.writeNow(this.desiredSession)
       if (this.autoGenerate) this.writeNow({ type: 'set_auto_generate', enabled: true })
+      if (this.codingMode) this.writeNow({ type: 'set_coding_mode', enabled: true })
       if (this.captureState) {
         this.writeNow({
           type: 'capture_state',
@@ -282,6 +284,7 @@ export class BackendSessionClient extends EventEmitter {
   sendStopSession(): void {
     this.desiredSession = null
     this.autoGenerate = false
+    this.codingMode = false
     this.captureState = null
     this.send({ type: 'stop_session' })
   }
@@ -296,6 +299,11 @@ export class BackendSessionClient extends EventEmitter {
   sendAutoGenerate(enabled: boolean): void {
     this.autoGenerate = enabled
     this.send({ type: 'set_auto_generate', enabled })
+  }
+  /** Toggle Coding mode (force code-first answers); replayed on reconnect. */
+  sendCodingMode(enabled: boolean): void {
+    this.codingMode = enabled
+    this.send({ type: 'set_coding_mode', enabled })
   }
   /** Send a screenshot for vision-based question extraction + answer (Phase 2). */
   sendScreenshotQuestion(imageBase64: string, mimeType: string): void {
