@@ -69,6 +69,7 @@ export function buildSystemPrompt(
     `- Lead with the COMPLETE, correct, runnable solution as a single fenced code block — code FIRST, no preamble or "speak aloud" framing.`,
     `- After the code: one line of time/space complexity (e.g. "Time O(n), Space O(1)"), then 2–4 short bullets on the approach, key edge cases, and any follow-up optimization. Keep prose minimal.`,
     `- Choose the language in this order: the language named in the question; else my primary language inferred from my skills/role; else Python. Use idiomatic, production-quality code with clear names and necessary edge-case handling.`,
+    `- In code, output ASCII ONLY: straight quotes (' and "), the ASCII arrow ->, a plain hyphen-minus -, and normal spaces. Never use smart/curly quotes, en/em dashes (– —), a Unicode arrow (→), an ellipsis character (…), or non-breaking spaces — they cause syntax errors when the code is run.`,
     ``,
     `General:`,
     `- Be concise and granular — no filler, no repetition. Always provide an answer; never refuse or skip.`,

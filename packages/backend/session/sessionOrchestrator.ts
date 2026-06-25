@@ -11,6 +11,7 @@ import {
   buildSystemPrompt,
   classifyScope,
   detectTopics,
+  sanitizeCodeInMarkdown,
   scopeColor,
   DEFAULT_ROLE_ADJACENCY,
   DEFAULT_TOPIC_ROLE_MAP,
@@ -229,17 +230,22 @@ export class SessionOrchestrator {
       return
     }
 
+    // Repair Unicode look-alikes inside code blocks (smart quotes, en/em dashes,
+    // → arrows, NBSP, …) so the answer is valid when pasted into a real
+    // interpreter / judge. Prose typography is left intact.
+    const answer = sanitizeCodeInMarkdown(result.answer)
+
     // Persist the Q&A pair (Req 17.5).
     await this.d.repos.qna.append(this.d.sessionId, this.d.accountId, {
       question,
-      answer: result.answer,
+      answer,
       topics,
       scope,
       timestamp: new Date().toISOString(),
     })
 
-    this.d.emit.answerComplete(result.answer)
-    this.recordTurn(question, result.answer)
+    this.d.emit.answerComplete(answer)
+    this.recordTurn(question, answer)
 
     await this.checkCredits()
   }
