@@ -117,6 +117,26 @@ export class SessionOrchestrator {
     await this.generate(question, this.currentTopics, this.currentScope)
   }
 
+  /**
+   * A screenshot of an on-screen interview question (Phase 2 vision). The
+   * vision model reads the question from the image and answers it as the
+   * candidate. Topics can't be detected from an image, so we treat it as
+   * in-scope and skip topic badges. Routed through the same streaming/persist
+   * path as a normal answer.
+   */
+  async handleScreenshot(imageBase64: string, mimeType: string): Promise<void> {
+    if (this.exhausted) return
+    const question = 'Screenshot question'
+    const scope: ScopeClassification = 'in-scope'
+    this.currentQuestion = question
+    this.currentTopics = []
+    this.currentScope = scope
+    this.hasPending = false
+    this.d.emit.topics([])
+    this.d.emit.scope(scope, scopeColor(scope))
+    await this.generate(question, [], scope, { imageBase64, mimeType })
+  }
+
   /** Compute topics + scope for a question and relay the badges. */
   private prepare(question: string): void {
     const topics = detectTopics(question)
@@ -142,9 +162,14 @@ export class SessionOrchestrator {
   private async generate(
     question: string,
     topics: TopicDomain[],
-    scope: ScopeClassification
+    scope: ScopeClassification,
+    image?: { imageBase64: string; mimeType: string }
   ): Promise<void> {
-    const systemPrompt = buildSystemPrompt(this.d.profile, scope)
+    // For a screenshot question, instruct the vision model to read the question
+    // FROM the image (the `question` text is only a placeholder/label).
+    const systemPrompt = image
+      ? `${buildSystemPrompt(this.d.profile, scope)}\n\nThe user has shared a SCREENSHOT of an interview question (it may be a coding task, multiple-choice question, system-design prompt, or written question). Read the question directly from the image and answer it as the candidate. If it is multiple choice, state the correct option and briefly why.`
+      : buildSystemPrompt(this.d.profile, scope)
     const seq = ++this.generationSeq
 
     // Pass prior turns as context. For a regenerate of the current question,
@@ -154,12 +179,17 @@ export class SessionOrchestrator {
       last && last.question === question ? this.history.slice(0, -1) : this.history.slice()
 
     // eslint-disable-next-line no-console
-    console.log('[orchestrator] generating answer for:', question.slice(0, 80))
+    console.log('[orchestrator] generating answer for:', image ? '[screenshot]' : question.slice(0, 80))
 
     let result
     try {
       result = await this.d.llmProvider.generate(
-        { systemPrompt, question, history: priorHistory },
+        {
+          systemPrompt,
+          question,
+          history: priorHistory,
+          ...(image ? { imageBase64: image.imageBase64, imageMimeType: image.mimeType } : {}),
+        },
         (token) => {
           if (seq !== this.generationSeq) return
           this.d.emit.answerToken(token)

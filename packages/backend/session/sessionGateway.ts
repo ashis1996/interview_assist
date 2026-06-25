@@ -35,7 +35,14 @@ export interface SessionGatewayDeps {
   creditsService: CreditsService
   sttRelayFactory: SttRelayFactory
   /** LLM config (provider/model/apiKey come from server secrets). */
-  llmConfig: { provider?: string; model?: string; apiKey?: string }
+  llmConfig: {
+    provider?: string
+    model?: string
+    apiKey?: string
+    visionProvider?: string
+    visionModel?: string
+    visionApiKey?: string
+  }
   llmDeps?: LlmProviderDeps
   lowCreditThreshold: number
   defaultSttProvider: 'deepgram' | 'whisper'
@@ -118,6 +125,13 @@ class Connection {
         break
       case 'set_auto_generate':
         this.orchestrator?.setAutoGenerate(msg.enabled)
+        break
+      case 'screenshot_question':
+        // Vision answer for an on-screen question. Fire-and-forget like text;
+        // the generation-seq guard makes the latest request win.
+        this.orchestrator
+          ?.handleScreenshot(msg.imageBase64, msg.mimeType)
+          .catch((e) => this.logGenError(e))
         break
       case 'regenerate':
         this.orchestrator?.regenerate().catch((e) => this.logGenError(e))

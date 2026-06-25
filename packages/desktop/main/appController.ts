@@ -6,7 +6,7 @@
 // frames captured in the renderer arrive over IPC and are forwarded to the
 // Session_Gateway via the BackendSessionClient.
 
-import { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, screen, session as electronSession, shell } from 'electron'
 import { createServer } from 'node:http'
 import { URL } from 'node:url'
 import type { Environment, Profile } from '@interview-assistant/shared'
@@ -45,6 +45,7 @@ import {
   IPC_OVERLAY_SET_CLICKTHROUGH,
   IPC_OVERLAY_MOVE_BY,
   IPC_APP_QUIT,
+  IPC_SCREENSHOT,
   IPC_EVT_TRANSCRIPT,
   IPC_EVT_FINAL_QUESTION,
   IPC_EVT_TOPICS,
@@ -132,6 +133,7 @@ const REQUEST_CHANNELS = [
   IPC_PRIVATE_MODE_SET,
   IPC_OVERLAY_SET_COLLAPSED,
   IPC_OVERLAY_SET_CLICKTHROUGH,
+  IPC_SCREENSHOT,
 ]
 
 export class AppController {
@@ -330,6 +332,35 @@ export class AppController {
     ipcMain.handle(IPC_PIPELINE_COPY, (): string => {
       clipboard.writeText(this.currentAnswer)
       return this.currentAnswer
+    })
+    ipcMain.handle(IPC_SCREENSHOT, async (): Promise<{ ok: boolean }> => {
+      try {
+        // Capture the display the overlay is on (multi-monitor aware). The
+        // overlay window has setContentProtection(true) -> WDA_EXCLUDEFROMCAPTURE
+        // on Windows, so it is excluded from the capture and the question
+        // BEHIND it is what gets photographed.
+        const win = this.windowManager.window
+        const display =
+          win && !win.isDestroyed()
+            ? screen.getDisplayMatching(win.getBounds())
+            : screen.getPrimaryDisplay()
+        const { width, height } = display.size
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: { width, height },
+        })
+        const source =
+          sources.find((s) => String(s.display_id) === String(display.id)) ?? sources[0]
+        const image = source?.thumbnail
+        if (!image || image.isEmpty()) return { ok: false }
+        const base64 = image.toPNG().toString('base64')
+        this.sessionClient?.sendScreenshotQuestion(base64, 'image/png')
+        return { ok: true }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[screenshot] capture failed:', err instanceof Error ? err.message : err)
+        return { ok: false }
+      }
     })
     ipcMain.handle(IPC_OVERLAY_SET_OPACITY, (_e, percent: number): number =>
       this.windowManager.setOverlayOpacityPercent(percent)

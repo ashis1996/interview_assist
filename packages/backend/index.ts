@@ -112,6 +112,18 @@ export async function startBackend(): Promise<void> {
           ? config.secrets.groqApiKey
           : config.secrets.anthropicApiKey
 
+  // The vision (screenshot) provider may differ from the text provider, so it
+  // needs its own matching API key. Defaults to the text provider when unset.
+  const visionProvider = config.defaultLlmVisionProvider ?? config.defaultLlmProvider
+  const visionApiKey =
+    visionProvider === 'openai'
+      ? config.secrets.openaiApiKey
+      : visionProvider === 'gemini'
+        ? config.secrets.geminiApiKey
+        : visionProvider === 'groq'
+          ? config.secrets.groqApiKey
+          : config.secrets.anthropicApiKey
+
   const httpApp = buildHttpServer({
     environment: config.environment,
     repos,
@@ -132,6 +144,11 @@ export async function startBackend(): Promise<void> {
         provider: config.defaultLlmProvider,
         ...(config.defaultLlmModel ? { model: config.defaultLlmModel } : {}),
         apiKey: llmApiKey,
+        ...(config.defaultLlmVisionProvider
+          ? { visionProvider: config.defaultLlmVisionProvider }
+          : {}),
+        ...(config.defaultLlmVisionModel ? { visionModel: config.defaultLlmVisionModel } : {}),
+        ...(visionApiKey ? { visionApiKey } : {}),
       },
       lowCreditThreshold: LOW_CREDIT_THRESHOLD,
       defaultSttProvider: config.defaultSttProvider,

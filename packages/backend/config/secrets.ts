@@ -40,6 +40,10 @@ export interface BackendConfig {
   defaultLlmProvider: string
   /** Optional explicit LLM model; falls back to the provider default when absent. */
   defaultLlmModel?: string
+  /** Optional VISION provider for screenshots (may differ from the text provider). */
+  defaultLlmVisionProvider?: string
+  /** Optional explicit VISION model for screenshot questions; falls back to the provider default. */
+  defaultLlmVisionModel?: string
   defaultSttProvider: 'deepgram' | 'whisper'
 }
 
@@ -83,6 +87,8 @@ export function loadBackendConfig(): BackendConfig {
     },
     defaultLlmProvider: env('DEFAULT_LLM_PROVIDER') ?? 'claude',
     defaultLlmModel: env('DEFAULT_LLM_MODEL'),
+    defaultLlmVisionProvider: env('DEFAULT_LLM_VISION_PROVIDER'),
+    defaultLlmVisionModel: env('DEFAULT_LLM_VISION_MODEL'),
     defaultSttProvider: (env('DEFAULT_STT_PROVIDER') as 'deepgram' | 'whisper') ?? 'deepgram',
   }
 }

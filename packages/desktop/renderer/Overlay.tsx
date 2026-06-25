@@ -43,7 +43,7 @@ import {
   type ScopePayload,
 } from '../shared/ipc'
 
-const MAX_STREAM_SENTENCES = 8
+const MAX_STREAM_SENTENCES = 50
 
 function formatElapsed(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -74,9 +74,18 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
   const [opacity, setOpacity] = useState(95)
   const [elapsed, setElapsed] = useState(0)
   const [stealth, setStealth] = useState(false)
+  // The transcript capsule the user explicitly selected to answer (click to
+  // select). When set, the Answer button targets THIS question instead of the
+  // latest finalized one. Stored by text value.
+  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null)
   const captureRef = useRef<AudioCapture | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const streamEndRef = useRef<HTMLDivElement | null>(null)
+  const streamTrackRef = useRef<HTMLDivElement | null>(null)
+  // Only auto-scroll the transcript to the newest capsule when the user is
+  // already at the right edge; if they've scrolled left to read history, leave
+  // their position alone.
+  const followRef = useRef(true)
   const answerEndRef = useRef<HTMLDivElement | null>(null)
   const pendingTokensRef = useRef('')
   const rafRef = useRef<number | null>(null)
@@ -150,9 +159,12 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
     }
   }, [props])
 
-  // Keep the newest transcript capsule scrolled into view (right edge).
+  // Keep the newest transcript capsule scrolled into view (right edge) — but
+  // only while the user is following the live edge (not scrolled back reading).
   useEffect(() => {
-    streamEndRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'end', block: 'nearest' })
+    if (followRef.current) {
+      streamEndRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'end', block: 'nearest' })
+    }
   }, [sentences, liveTranscript])
 
   // Auto-scroll the answer card as tokens stream in.
@@ -176,18 +188,36 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
 
   const hasAnswerPanel = Boolean(answer || generating || answeredQuestion)
 
-  const onAnswer = (): void => {
-    const q = (latestQuestion || liveTranscript).trim()
+  const answerQuestion = (raw: string): void => {
+    const q = (raw || '').trim()
     if (!q) return
     setAnsweredQuestion(q)
     setAnswer('')
     setGenerating(true)
-    // Answer the latest known question directly so the button ALWAYS generates
-    // (the server's pending-question flag could otherwise make it a no-op after
-    // the question was already answered or before the next one finalizes).
     void window.api.submitTextQuestion(q)
   }
+  const onAnswer = (): void => {
+    // Prefer an explicitly selected transcript chunk; else the latest finalized
+    // question; else whatever is being spoken right now.
+    answerQuestion(selectedQuestion || latestQuestion || liveTranscript)
+  }
   onAnswerRef.current = onAnswer
+  const onSelectChunk = (text: string): void =>
+    setSelectedQuestion((prev) => (prev === text ? null : text))
+  const scrollStream = (dir: -1 | 1): void => {
+    streamTrackRef.current?.scrollBy({ left: dir * 260, behavior: 'smooth' })
+  }
+  const onStreamScroll = (): void => {
+    const el = streamTrackRef.current
+    if (!el) return
+    followRef.current = el.scrollWidth - el.scrollLeft - el.clientWidth < 48
+  }
+  const onStreamWheel = (e: React.WheelEvent<HTMLDivElement>): void => {
+    const el = streamTrackRef.current
+    if (!el) return
+    // Translate vertical wheel into horizontal scroll over the transcript lane.
+    el.scrollLeft += e.deltaY + e.deltaX
+  }
   const toggleStealth = (): void => {
     const v = !stealth
     setStealth(v)
@@ -206,11 +236,23 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
     setSentences([])
     setLatestQuestion('')
     setLiveTranscript('')
+    setSelectedQuestion(null)
   }
   const onRegenerate = (): void => {
     setAnswer('')
     setGenerating(true)
     void window.api.regenerate()
+  }
+  const onScreenshot = (): void => {
+    setAnsweredQuestion('Screenshot question')
+    setAnswer('')
+    setGenerating(true)
+    void window.api.captureScreenshot().then((r) => {
+      if (!r?.ok) {
+        setGenerating(false)
+        setBanner('Screenshot capture failed.')
+      }
+    })
   }
   const toggleMic = (): void => void captureRef.current?.setMicEnabled(!capture.micActive)
   const toggleSystem = (): void => void captureRef.current?.setSystemEnabled(!capture.systemActive)
@@ -260,7 +302,7 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
         <button className="pk-primary" onClick={onAnswer}>
           <SparkIcon size={15} /> Answer <kbd>Ctrl ↵</kbd>
         </button>
-        <button className="pk-ghost" disabled title="Coming soon">
+        <button className="pk-ghost" onClick={onScreenshot} title="Capture an on-screen question and answer it">
           <CameraIcon size={15} /> Screenshot
         </button>
         <button className={`pk-ghost${chatOpen ? ' active' : ''}`} onClick={() => setChatOpen((v) => !v)}>
@@ -305,17 +347,45 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
       )}
 
       {/* Flowing transcript stream: newest sentence enters at the right and
-          older sentences flow left, Parakeet-style. */}
+          older sentences flow left. Scroll back with the ‹ › buttons, the
+          draggable scrollbar, or the mouse wheel. Click a capsule to select it
+          (the Answer button then answers it); double-click to answer instantly. */}
       <div className="pk-stream">
-        <div className="pk-stream-track">
+        <button className="pk-stream-nav" onClick={() => scrollStream(-1)} title="Older transcripts">
+          ‹
+        </button>
+        <div
+          className="pk-stream-track"
+          ref={streamTrackRef}
+          onScroll={onStreamScroll}
+          onWheel={onStreamWheel}
+        >
           {sentences.length === 0 && !liveTranscript && (
             <span className="pk-sentence idle">
               {listening ? 'Listening…' : 'Waiting for audio…'}
             </span>
           )}
           {sentences.map((s, i) => (
-            <span key={`${i}-${s.slice(0, 12)}`} className="pk-sentence">
+            <span
+              key={`${i}-${s.slice(0, 12)}`}
+              className={`pk-sentence selectable${selectedQuestion === s ? ' selected' : ''}`}
+              title="Click to select · double-click to answer"
+              onClick={() => onSelectChunk(s)}
+              onDoubleClick={() => answerQuestion(s)}
+            >
               {s}
+              {selectedQuestion === s && (
+                <button
+                  className="pk-answer-this"
+                  title="Answer this question"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    answerQuestion(s)
+                  }}
+                >
+                  <SparkIcon size={12} /> Answer this
+                </button>
+              )}
             </span>
           ))}
           {liveTranscript && (
@@ -331,6 +401,9 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
           )}
           <div ref={streamEndRef} />
         </div>
+        <button className="pk-stream-nav" onClick={() => scrollStream(1)} title="Newer transcripts">
+          ›
+        </button>
         <button className="pk-clear" onClick={onClearStream} title="Clear transcript">
           <CloseIcon size={13} />
         </button>

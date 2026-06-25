@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-import { recognizeProvider, resolveModel, type LlmProviderName } from '@interview-assistant/shared'
+import { recognizeProvider, resolveModel, resolveVisionModel, type LlmProviderName } from '@interview-assistant/shared'
 
 /** A prior question/answer turn in the same session, for conversational memory. */
 export interface LlmTurn {
@@ -24,6 +24,10 @@ export interface LlmRequest {
   question: string
   /** Recent prior turns in this session (oldest first) for follow-up/context. */
   history?: LlmTurn[]
+  /** Optional screenshot image (base64, no data: prefix) for vision questions. */
+  imageBase64?: string
+  /** MIME type of {@link imageBase64} (e.g. 'image/png'). */
+  imageMimeType?: string
 }
 
 /** Token usage reported by a backend for metering (Req 9.2). */
@@ -100,12 +104,25 @@ class ClaudeBackend implements Backend {
       { role: 'user' as const, content: t.question },
       { role: 'assistant' as const, content: t.answer },
     ])
+    const userContent: Anthropic.MessageParam['content'] = req.imageBase64
+      ? [
+          { type: 'text', text: req.question },
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: (req.imageMimeType ?? 'image/png') as 'image/png',
+              data: req.imageBase64,
+            },
+          },
+        ]
+      : req.question
     const stream = await this.client.messages.create(
       {
         model: this.model,
         max_tokens: MAX_TOKENS,
         system: req.systemPrompt,
-        messages: [...history, { role: 'user', content: req.question }],
+        messages: [...history, { role: 'user', content: userContent }],
         stream: true,
       },
       { signal }
@@ -146,17 +163,30 @@ class OpenAIBackend implements Backend {
       { role: 'user' as const, content: t.question },
       { role: 'assistant' as const, content: t.answer },
     ])
+    const isGroqReasoning = this.providerName === 'groq' && /gpt-oss/i.test(this.model)
+    const userContent: OpenAI.Chat.ChatCompletionUserMessageParam['content'] = req.imageBase64
+      ? [
+          { type: 'text', text: req.question },
+          {
+            type: 'image_url',
+            image_url: { url: `data:${req.imageMimeType ?? 'image/png'};base64,${req.imageBase64}` },
+          },
+        ]
+      : req.question
+    const params = {
+      model: this.model,
+      messages: [
+        { role: 'system' as const, content: req.systemPrompt },
+        ...history,
+        { role: 'user' as const, content: userContent },
+      ],
+      stream: true as const,
+      stream_options: { include_usage: true },
+      // Groq gpt-oss reasoning controls (ignored/omitted for other providers).
+      ...(isGroqReasoning ? { reasoning_effort: 'low', reasoning_format: 'hidden' } : {}),
+    }
     const stream = await this.client.chat.completions.create(
-      {
-        model: this.model,
-        messages: [
-          { role: 'system', content: req.systemPrompt },
-          ...history,
-          { role: 'user', content: req.question },
-        ],
-        stream: true,
-        stream_options: { include_usage: true },
-      },
+      params as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
       { signal }
     )
     let answer = ''
@@ -179,12 +209,14 @@ class OpenAIBackend implements Backend {
 
   async prewarm(): Promise<void> {
     // Prime the keep-alive HTTPS connection so the first answer skips cold-start.
+    const isGroqReasoning = this.providerName === 'groq' && /gpt-oss/i.test(this.model)
     await this.client.chat.completions.create({
       model: this.model,
       messages: [{ role: 'user', content: 'hi' }],
       max_tokens: 1,
       stream: false,
-    })
+      ...(isGroqReasoning ? { reasoning_effort: 'low' } : {}),
+    } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
   }
 }
 
@@ -213,7 +245,14 @@ class GeminiBackend implements Backend {
         { role: 'model', parts: [{ text: t.answer }] },
       ]),
     })
-    const result = await chat.sendMessageStream(req.question)
+    const result = await chat.sendMessageStream(
+      req.imageBase64
+        ? [
+            { text: req.question },
+            { inlineData: { mimeType: req.imageMimeType ?? 'image/png', data: req.imageBase64 } },
+          ]
+        : req.question
+    )
     let answer = ''
     let usage: LlmUsage | undefined
     for await (const chunk of result.stream) {
@@ -320,7 +359,15 @@ async function runWithTimeout(
  * configuration error rather than throwing (Req 15.6).
  */
 export function createLlmProvider(
-  config: { provider?: string; model?: string; apiKey?: string },
+  config: {
+    provider?: string
+    model?: string
+    apiKey?: string
+    /** Screenshot/vision overrides — may target a DIFFERENT provider than text. */
+    visionProvider?: string
+    visionModel?: string
+    visionApiKey?: string
+  },
   deps: LlmProviderDeps = {}
 ): LlmProvider {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS
@@ -366,10 +413,43 @@ export function createLlmProvider(
     }
   }
 
+  // A separate VISION-capable backend for screenshot questions. This MAY be a
+  // different provider than the text model (e.g. text = Groq for speed/cost,
+  // vision = Gemini for quality) — each with its own model + API key. Falls
+  // back to the text provider/model when not separately configured, and to the
+  // text backend entirely if a cross-provider vision backend can't be built
+  // (e.g. its API key is missing).
+  let visionBackend: Backend = backend
+  let visionProvider: LlmProviderName = provider
+  try {
+    const recognizedVision =
+      config.visionProvider && config.visionProvider.trim().length > 0
+        ? recognizeProvider(config.visionProvider)
+        : { kind: 'ok' as const, provider }
+    visionProvider = recognizedVision.kind === 'ok' ? recognizedVision.provider : provider
+    const visionModel = resolveVisionModel(visionProvider, config.visionModel)
+
+    if (visionProvider !== provider) {
+      // Cross-provider vision needs its own key; without one, keep the text
+      // backend so we never construct an unauthenticated client.
+      const visionKey = config.visionApiKey ?? ''
+      if (visionKey) visionBackend = buildBackend(visionProvider, visionModel, visionKey)
+      else visionProvider = provider
+    } else if (visionModel !== model) {
+      visionBackend = buildBackend(provider, visionModel, apiKey)
+    }
+  } catch {
+    visionBackend = backend
+    visionProvider = provider
+  }
+
   return {
     generate: async (req, onToken, onUsage) => {
-      const result = await runWithTimeout(provider, timeoutMs, clock, (signal) =>
-        backend.stream(req, onToken, signal)
+      const useVision = Boolean(req.imageBase64)
+      const chosen = useVision ? visionBackend : backend
+      const chosenProvider = useVision ? visionProvider : provider
+      const result = await runWithTimeout(chosenProvider, timeoutMs, clock, (signal) =>
+        chosen.stream(req, onToken, signal)
       )
       if (result.kind === 'ok' && result.usage && onUsage) {
         onUsage(result.usage)

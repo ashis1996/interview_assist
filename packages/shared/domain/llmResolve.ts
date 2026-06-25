@@ -68,3 +68,29 @@ export function resolveModel(provider: LlmProviderName, configuredModel?: string
   }
   return DEFAULT_MODELS[provider]
 }
+
+/**
+ * Default VISION-capable model per provider, used for screenshot questions when
+ * no explicit vision model is configured. The primary chat model may be
+ * text-only (e.g. Groq's gpt-oss family), so screenshots route to these
+ * image-capable models instead. Override via DEFAULT_LLM_VISION_MODEL.
+ */
+const DEFAULT_VISION_MODELS: Record<LlmProviderName, string> = {
+  claude: 'claude-sonnet-4',
+  openai: 'gpt-4o-mini',
+  gemini: 'gemini-2.5-flash',
+  // Groq's current multimodal model (Llama 4 Scout supports image input).
+  groq: 'meta-llama/llama-4-scout-17b-16e-instruct',
+}
+
+/**
+ * Resolve the model to use for a vision (screenshot) request. Returns the
+ * configured vision model when present and non-empty, else the provider's
+ * image-capable default.
+ */
+export function resolveVisionModel(provider: LlmProviderName, configuredModel?: string): string {
+  if (configuredModel !== undefined && configuredModel.trim().length > 0) {
+    return configuredModel
+  }
+  return DEFAULT_VISION_MODELS[provider]
+}
