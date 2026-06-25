@@ -74,10 +74,38 @@ function apiKeyForProvider(provider: string | undefined, secrets: ReturnType<typ
   }
 }
 
+/** Human-readable DB target for logs (host:port/db) WITHOUT leaking the password. */
+function describeDbTarget(url: string | undefined): string {
+  if (!url || url.trim().length === 0) {
+    return 'DATABASE_URL is NOT set → defaulting to localhost:5432 (no DB exists in the container; set DATABASE_URL on Railway)'
+  }
+  try {
+    const u = new URL(url)
+    return `${u.hostname}:${u.port || '5432'} db=${u.pathname.replace(/^\//, '') || '(default)'}`
+  } catch {
+    return 'DATABASE_URL is set but could not be parsed'
+  }
+}
+
+/** Describe an error including a pg-style error code when present. */
+function describeError(err: unknown): string {
+  if (err instanceof Error) {
+    const code = (err as { code?: string }).code
+    const msg = err.message || '(no message)'
+    return code ? `${msg} [code=${code}]` : msg
+  }
+  return String(err)
+}
+
 export async function startBackend(): Promise<void> {
   const config = loadBackendConfig()
   const pool = new Pool({ connectionString: config.databaseUrl })
   const repos = createPostgresRepositories(pool)
+
+  // Surface exactly which DB we're targeting so a blank/misconfigured
+  // DATABASE_URL is obvious in the deploy logs (never print the password).
+  // eslint-disable-next-line no-console
+  console.log(`[backend] DB target: ${describeDbTarget(config.databaseUrl)}`)
 
   // Verify DB connectivity up front so failures are obvious, not silent.
   try {
@@ -88,7 +116,7 @@ export async function startBackend(): Promise<void> {
     // eslint-disable-next-line no-console
     console.error(
       '[backend] DATABASE CONNECTION FAILED — auth/sessions will not work:',
-      err instanceof Error ? err.message : err
+      describeError(err)
     )
   }
 
@@ -101,10 +129,14 @@ export async function startBackend(): Promise<void> {
     console.log('[backend] schema migration applied')
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error(
-      '[backend] SCHEMA MIGRATION FAILED — refusing to start:',
-      err instanceof Error ? err.message : err
-    )
+    console.error('[backend] SCHEMA MIGRATION FAILED — refusing to start:', describeError(err))
+    if (!config.databaseUrl || config.databaseUrl.trim().length === 0) {
+      // eslint-disable-next-line no-console
+      console.error(
+        '[backend] HINT: DATABASE_URL is empty. Add a PostgreSQL service in Railway and set ' +
+          'DATABASE_URL=${{Postgres.DATABASE_URL}} on this service, then redeploy.'
+      )
+    }
     process.exit(1)
   }
 
