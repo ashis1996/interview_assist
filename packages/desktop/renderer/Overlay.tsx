@@ -503,7 +503,7 @@ export function Overlay(props: { onEnded: () => void; onCollapse: () => void }):
                   <i />
                   <i />
                   <i />
-                </span>
+                </span>{' '}
                 Generating answer…
               </span>
             )}

@@ -106,7 +106,7 @@ export class AudioCapture {
   }
 
   /** Initialise the audio graph and enable the requested sources. */
-  async start(opts: { mic?: boolean; system?: boolean } = { mic: true, system: true }): Promise<void> {
+  async start(opts?: { mic?: boolean; system?: boolean }): Promise<void> {
     if (this.started) return
     const ctx = new AudioContext()
     this.context = ctx
@@ -148,8 +148,8 @@ export class AudioCapture {
     }
 
     this.started = true
-    if (opts.mic ?? true) await this.setMicEnabled(true)
-    if (opts.system ?? true) await this.setSystemEnabled(true)
+    if (opts?.mic ?? true) await this.setMicEnabled(true)
+    if (opts?.system ?? true) await this.setSystemEnabled(true)
     this.emitState()
   }
 

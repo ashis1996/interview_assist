@@ -1,2 +1,6 @@
 {
+    "sonarlint.connectedMode.project": {
+        "connectionId": "ashis1996",
+        "projectKey": "ashis1996_interview_assist"
+    }
 }

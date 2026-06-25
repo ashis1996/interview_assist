@@ -13,7 +13,7 @@ import type {
 } from '@interview-assistant/shared'
 
 // --- Auth + environment (NEW) ---------------------------------------------
-export const IPC_AUTH_SIGN_IN_PASSWORD = 'auth:signInPassword'
+export const IPC_AUTH_SIGN_IN_PASSWORD = 'auth:signInPassword' // NOSONAR: IPC channel name, not a credential
 export const IPC_AUTH_SIGN_IN_GOOGLE = 'auth:signInGoogle'
 export const IPC_AUTH_SIGN_OUT = 'auth:signOut'
 export const IPC_AUTH_RESTORE = 'auth:restore'
